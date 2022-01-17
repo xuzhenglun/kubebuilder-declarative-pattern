@@ -74,6 +74,10 @@ type DeclarativeObject interface {
 	metav1.Object
 }
 
+type Pruner interface {
+	Prune() bool
+}
+
 type ErrorResult struct {
 	Result reconcile.Result
 	Err    error
@@ -248,7 +252,7 @@ func (r *Reconciler) reconcileExists(ctx context.Context, name types.NamespacedN
 
 	extraArgs := []string{"--force"}
 
-	if r.options.prune {
+	if p, ok := instance.(Pruner); r.options.prune || (ok && p.Prune()) {
 		var labels []string
 		for k, v := range r.options.labelMaker(ctx, instance) {
 			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
