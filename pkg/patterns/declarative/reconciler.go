@@ -74,6 +74,14 @@ type DeclarativeObject interface {
 	metav1.Object
 }
 
+type Pruner interface {
+	Prune() bool
+}
+
+type PruneWhiteLister interface {
+	PruneWhiteList() []string
+}
+
 type ErrorResult struct {
 	Result reconcile.Result
 	Err    error
@@ -267,13 +275,20 @@ func (r *Reconciler) reconcileExists(ctx context.Context, name types.NamespacedN
 
 	extraArgs := []string{"--force"}
 
-	if r.options.prune {
+	// allow user disable prune in CR
+	if p, ok := instance.(Pruner); (!ok && r.options.prune) || (ok && r.options.prune && p.Prune()) {
 		var labels []string
 		for k, v := range r.options.labelMaker(ctx, instance) {
 			labels = append(labels, fmt.Sprintf("%s=%s", k, v))
 		}
 
 		extraArgs = append(extraArgs, "--prune", "--selector", strings.Join(labels, ","))
+
+		if lister, ok := instance.(PruneWhiteLister); ok {
+			for _, gvk := range lister.PruneWhiteList() {
+				extraArgs = append(extraArgs, "--prune-whitelist", gvk)
+			}
+		}
 	}
 
 	ns := ""
